@@ -27,6 +27,12 @@ try:
 except ImportError:
     DEPS_OK = False
 
+try:
+    import cloudscraper
+    CF_SCRAPER = cloudscraper.create_scraper()
+except ImportError:
+    CF_SCRAPER = None
+
 
 ROOT = Path(__file__).parent.parent  # dsa-tutor/
 TEMPLATE_FILE = ROOT / "templates" / "problem.cpp.template"
@@ -203,10 +209,21 @@ def fetch_codeforces(url: str) -> dict:
     - Problem statement text: HTML scrape (API does not expose statement text)
     """
     # parse contest_id and problem index from URL
-    # supports: /contest/1234/problem/A  and  /problemset/problem/1234/A
-    m = re.search(r"codeforces\.com/(?:contest|problemset/problem)/(\d+)/(?:problem/)?([A-Z]\d*)", url, re.I)
+    # Valid CF URL formats:
+    #   https://codeforces.com/contest/1234/problem/A
+    #   https://codeforces.com/problemset/problem/1234/A
+    #   https://codeforces.com/gym/1234/problem/A
+    m = re.search(
+        r"codeforces\.com/(?:contest|problemset/problem|gym)/(\d+)/(?:problem/)?([A-Z]\d*)",
+        url, re.I
+    )
     if not m:
-        raise ValueError(f"Could not parse Codeforces URL: {url}")
+        raise ValueError(
+            f"Could not parse Codeforces URL: {url}\n"
+            "Valid formats:\n"
+            "  https://codeforces.com/contest/1234/problem/A\n"
+            "  https://codeforces.com/problemset/problem/1234/A"
+        )
     contest_id, prob_index = m.group(1), m.group(2).upper()
 
     # ── Step 1: fetch metadata via official API ────────────────────────────────
@@ -232,24 +249,19 @@ def fetch_codeforces(url: str) -> dict:
         difficulty = "CF"
 
     # ── Step 2: scrape HTML for the problem statement (API doesn't return it) ─
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/124.0.0.0 Safari/537.36"
-        ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-    }
+    # cloudscraper handles Cloudflare JS challenge; plain requests gets 403
     time.sleep(1)  # brief pause before HTML fetch
     statement_text = input_text = output_text = examples = None
     extra = ""
 
     try:
-        resp = requests.get(url, headers=headers, timeout=15)
+        # cloudscraper bypasses Cloudflare JS challenge that blocks plain requests
+        if CF_SCRAPER:
+            resp = CF_SCRAPER.get(url, timeout=20)
+        else:
+            print("  [warn] cloudscraper not installed — falling back to requests (may get 403)")
+            print("  Install with: pip3 install cloudscraper")
+            resp = requests.get(url, headers=headers, timeout=15)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
 
@@ -262,14 +274,23 @@ def fetch_codeforces(url: str) -> dict:
         statement_div = soup.find("div", class_="problem-statement")
         if statement_div:
             has_math = bool(statement_div.find("span", class_="MathJax"))
-            statement_text = h2t(str(statement_div))
+
+            # extract input/output/note text BEFORE decomposing them
+            input_spec  = statement_div.find("div", class_="input-specification")
+            output_spec = statement_div.find("div", class_="output-specification")
+            input_text  = h2t(str(input_spec)).strip()  if input_spec  else "(see problem)"
+            output_text = h2t(str(output_spec)).strip() if output_spec else "(see problem)"
+
+            # now strip noise from the statement: header (title/limits), input, output, samples, note
+            for tag in statement_div.find_all("div", class_=["header",
+                                                               "input-specification",
+                                                               "output-specification",
+                                                               "sample-tests",
+                                                               "note"]):
+                tag.decompose()
+
+            statement_text = h2t(str(statement_div)).strip()
             extra = "\n// # MATH_CLEANUP_NEEDED — MathJax formulas may be garbled above" if has_math else ""
-
-        input_spec = soup.find("div", class_="input-specification")
-        input_text = h2t(str(input_spec)) if input_spec else "(see problem)"
-
-        output_spec = soup.find("div", class_="output-specification")
-        output_text = h2t(str(output_spec)) if output_spec else "(see problem)"
 
         # examples from HTML
         example_inputs  = [tag.get_text() for tag in soup.select("div.input pre")]
@@ -417,11 +438,24 @@ def fetch_problem_data(url: Optional[str], use_stdin: bool) -> dict:
         return fetch_stdin()
 
 
+def _wrap(text: str) -> str:
+    """Prefix every line with '// ' so it sits cleanly inside C++ comments."""
+    return "\n// ".join(text.splitlines())
+
+
+def _strip_heading(text: str, *headings) -> str:
+    """Remove redundant first-line headings like 'Input', 'Output'."""
+    lines = text.splitlines()
+    if lines and lines[0].strip() in headings:
+        lines = lines[1:]
+    return "\n".join(lines).strip()
+
+
 def write_problem_file(problem: dict, out_path: Path, company: str, repeat_status: str):
     template = read_template(TEMPLATE_FILE)
-    # wrap statement lines with // prefix
-    stmt_lines = problem["statement"].splitlines()
-    stmt_wrapped = "\n// ".join(stmt_lines)
+
+    input_text = _strip_heading(problem["input_format"], "Input", "INPUT")
+    output_text = _strip_heading(problem["output_format"], "Output", "OUTPUT")
 
     fields = {
         "TITLE": problem["title"],
@@ -432,11 +466,11 @@ def write_problem_file(problem: dict, out_path: Path, company: str, repeat_statu
         "DIFFICULTY": problem["difficulty"],
         "COMPANY": company,
         "REPEAT_STATUS": repeat_status,
-        "STATEMENT": stmt_wrapped,
-        "INPUT_FORMAT": problem["input_format"],
-        "OUTPUT_FORMAT": problem["output_format"],
-        "CONSTRAINTS": problem["constraints"],
-        "EXAMPLES": problem["examples"],
+        "STATEMENT": _wrap(problem["statement"]),
+        "INPUT_FORMAT": _wrap(input_text),
+        "OUTPUT_FORMAT": _wrap(output_text),
+        "CONSTRAINTS": _wrap(problem["constraints"]),
+        "EXAMPLES": _wrap(problem["examples"]),
         "HINT_1": "TODO — to be filled by Claude before the session starts",
         "HINT_2": "TODO — to be filled by Claude before the session starts",
         "TC": "?",
