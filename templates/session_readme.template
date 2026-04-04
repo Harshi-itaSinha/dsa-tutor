@@ -1,0 +1,30 @@
+# Session: {{SESSION_DIR}}
+
+| Field | Value |
+|-------|-------|
+| Date | {{DATE}} |
+| Type | {{TYPE}} |
+| Company / Topic | {{COMPANY_OR_TOPIC}} |
+| Duration | {{DURATION}} min |
+| Language | {{LANG}} |
+
+## Problems
+
+| # | File | Title | Difficulty | Tags | Repeat? |
+|---|------|-------|-----------|------|---------|
+| 1 | {{P1_FILE}} | {{P1_TITLE}} | {{P1_DIFF}} | {{P1_TAGS}} | No |
+| 2 | {{P2_FILE}} | {{P2_TITLE}} | {{P2_DIFF}} | {{P2_TAGS}} | No |
+| 3 | {{P3_FILE}} | {{P3_TITLE}} | {{P3_DIFF}} | {{P3_TAGS}} | No |
+| 4 | {{P4_FILE}} | {{P4_TITLE}} | {{P4_DIFF}} | {{P4_TAGS}} | No |
+| 5 | {{P5_FILE}} | {{P5_TITLE}} | {{P5_DIFF}} | {{P5_TAGS}} | YES — from {{P5_ORIGIN}} |
+
+## Test Results
+
+_Appended automatically by run_tests.py_
+
+| Problem | Tests Passed | Tests Total | Status |
+|---------|-------------|-------------|--------|
+
+## Session Notes
+
+_Fill after session — or run `python3 scripts/update_patterns.py --session <dir>`_

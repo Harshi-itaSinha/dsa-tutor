@@ -1,0 +1,71 @@
+// =============================================================================
+// PROBLEM: {{TITLE}}
+// SOURCE:  {{URL}}  |  Platform: {{PLATFORM}}
+// ADDED:   {{DATE}}  |  TAGS: {{TAGS}}
+// DIFFICULTY: {{DIFFICULTY}}  |  COMPANY: {{COMPANY}}
+// REPEAT: {{REPEAT_STATUS}}
+// =============================================================================
+//
+// PROBLEM STATEMENT:
+// -----------------------------------------------------------------------
+// {{STATEMENT}}
+//
+// Input:
+//   {{INPUT_FORMAT}}
+//
+// Output:
+//   {{OUTPUT_FORMAT}}
+//
+// Constraints:
+//   {{CONSTRAINTS}}
+//
+// Examples:
+//   {{EXAMPLES}}
+//
+// -----------------------------------------------------------------------
+//
+// [TIER 1 HINT — Nudge, no spoilers. Read after 15+ min stuck]:
+// -----------------------------------------------------------------------
+//   {{HINT_1}}
+//
+// [TIER 2 HINT — Concrete approach. Read after 30+ min stuck]:
+// -----------------------------------------------------------------------
+//   {{HINT_2}}
+//   Time complexity: {{TC}}  |  Space complexity: {{SC}}
+//
+// -----------------------------------------------------------------------
+//
+// YOUR NOTES (fill after solving):
+// -----------------------------------------------------------------------
+//   Approach tried:
+//
+//   Time complexity:
+//   Space complexity:
+//   Edge cases missed:
+//   Confidence (1-5):
+//
+// =============================================================================
+
+#include <bits/stdc++.h>
+using namespace std;
+#define ll long long
+#define pii pair<int,int>
+#define vi vector<int>
+#define vvi vector<vector<int>>
+
+// ===== YOUR SOLUTION BELOW =====
+
+class Solution {
+public:
+
+};
+
+int main() {
+    ios_base::sync_with_stdio(false);
+    cin.tie(NULL);
+
+    // Write your manual test driver here (optional).
+    // Automated tests are run via: python3 scripts/run_tests.py <this-file>
+
+    return 0;
+}
