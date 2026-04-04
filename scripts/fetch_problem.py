@@ -67,6 +67,108 @@ def h2t(html: str) -> str:
     return converter.handle(html).strip()
 
 
+def clean_cf_math(text: str) -> str:
+    """
+    Convert Codeforces LaTeX math notation to readable plain text.
+
+    CF uses $$$...$$$  for inline math and $$$$$$ ... $$$$$$ for block math.
+    Inside: standard LaTeX with CF conventions.
+    """
+    # ── 1. block math: $$$$$$ ... $$$$$$ → newline-wrapped content ────────────
+    def replace_block(m):
+        inner = m.group(1).strip()
+        return "\n" + _latex_to_text(inner) + "\n"
+    text = re.sub(r'\$\$\$\$\$\$(.*?)\$\$\$\$\$\$', replace_block, text, flags=re.DOTALL)
+
+    # ── 2. inline math: $$$...$$$  → cleaned content ──────────────────────────
+    def replace_inline(m):
+        return _latex_to_text(m.group(1))
+    text = re.sub(r'\$\$\$(.*?)\$\$\$', replace_inline, text)
+
+    # ── 3. leftover isolated $$ or $ ──────────────────────────────────────────
+    text = text.replace('$$$', '').replace('$$', '').replace('$', '')
+
+    # ── 4. final pass: clean any bare LaTeX that survived outside $$$...$$$
+    #       (html2text sometimes strips delimiters but leaves commands)
+    text = _latex_symbols(text)
+
+    # ── 5. tidy up excess blank lines ─────────────────────────────────────────
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
+def _latex_to_text(expr: str) -> str:
+    """Convert a single LaTeX expression to readable ASCII."""
+    s = expr.strip()
+
+    # \begin{cases} x & \text{if} cond, \\ y & \text{otherwise} \end{cases}
+    cases_m = re.search(r'\\begin\{cases\}(.*?)\\end\{cases\}', s, re.DOTALL)
+    if cases_m:
+        cases_body = cases_m.group(1)
+        # split on \\ or \\\
+        rows = re.split(r'\\\\\\?', cases_body)
+        lines = []
+        for row in rows:
+            row = row.strip().rstrip(',').strip()
+            if not row:
+                continue
+            # split on & to get value and condition
+            parts = [p.strip() for p in row.split('&')]
+            if len(parts) == 2:
+                val  = _latex_symbols(parts[0])
+                cond = _latex_symbols(parts[1])
+                lines.append(f"{val:<8} {cond}")
+            else:
+                lines.append(_latex_symbols(row))
+        return "{ " + ";  ".join(lines)
+
+    return _latex_symbols(s)
+
+
+def _latex_symbols(s: str) -> str:
+    """Replace LaTeX commands with ASCII equivalents."""
+    replacements = [
+        (r'\\text\{([^}]*)\}',  r'\1'),       # \text{foo} → foo
+        (r'\\textit\{([^}]*)\}',r'\1'),       # \textit{foo} → foo
+        (r'\\mathbf\{([^}]*)\}',r'\1'),       # \mathbf{foo} → foo
+        (r'\\mathrm\{([^}]*)\}',r'\1'),       # \mathrm{foo} → foo
+        (r'\^\{\\text\{\*\}\}', '*'),          # ^{\text{∗}} → *  (footnote)
+        (r'\^\{\\ast\}',        '*'),          # ^{\ast} → *
+        (r'\\le\b',  '<='),
+        (r'\\leq\b', '<='),
+        (r'\\ge\b',  '>='),
+        (r'\\geq\b', '>='),
+        (r'\\lt\b',  '<'),
+        (r'\\gt\b',  '>'),
+        (r'\\neq\b', '!='),
+        (r'\\cdot\b','*'),
+        (r'\\times\b','x'),
+        (r'\\lfloor\b', 'floor('),
+        (r'\\rfloor\b', ')'),
+        (r'\\lceil\b',  'ceil('),
+        (r'\\rceil\b',  ')'),
+        (r'\\infty\b',  'inf'),
+        (r'\\pm\b',     '+/-'),
+        (r'\\ldots\b',  '...'),
+        (r'\\dots\b',   '...'),
+        (r'\\sum\b',    'sum'),
+        (r'\\max\b',    'max'),
+        (r'\\min\b',    'min'),
+        (r'\\log\b',    'log'),
+        (r'\\sqrt\{([^}]*)\}', r'sqrt(\1)'),
+        (r'\^\{([^}]*)\}', r'^\1'),           # ^{exp} → ^exp
+        (r'_\{([^}]*)\}',  r'_\1'),           # _{sub} → _sub
+        (r'\\\\',    ''),                      # \\ (line break) → nothing
+        (r'\\,',     ' '),                     # thin space
+        (r'\\;',     ' '),
+        (r'\\!',     ''),
+        (r'\\ ',     ' '),
+    ]
+    for pattern, repl in replacements:
+        s = re.sub(pattern, repl, s)
+    return s.strip()
+
+
 # ── platform fetchers ─────────────────────────────────────────────────────────
 
 def fetch_leetcode(url: str) -> dict:
@@ -278,8 +380,8 @@ def fetch_codeforces(url: str) -> dict:
             # extract input/output/note text BEFORE decomposing them
             input_spec  = statement_div.find("div", class_="input-specification")
             output_spec = statement_div.find("div", class_="output-specification")
-            input_text  = h2t(str(input_spec)).strip()  if input_spec  else "(see problem)"
-            output_text = h2t(str(output_spec)).strip() if output_spec else "(see problem)"
+            input_text  = clean_cf_math(h2t(str(input_spec)))  if input_spec  else "(see problem)"
+            output_text = clean_cf_math(h2t(str(output_spec))) if output_spec else "(see problem)"
 
             # now strip noise from the statement: header (title/limits), input, output, samples, note
             for tag in statement_div.find_all("div", class_=["header",
@@ -289,8 +391,8 @@ def fetch_codeforces(url: str) -> dict:
                                                                "note"]):
                 tag.decompose()
 
-            statement_text = h2t(str(statement_div)).strip()
-            extra = "\n// # MATH_CLEANUP_NEEDED — MathJax formulas may be garbled above" if has_math else ""
+            statement_text = clean_cf_math(h2t(str(statement_div)))
+            extra = ""  # clean_cf_math handles all LaTeX; no cleanup needed flag
 
         # examples from HTML
         example_inputs  = [tag.get_text() for tag in soup.select("div.input pre")]
