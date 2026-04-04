@@ -108,3 +108,106 @@ git push
 1. `coding_patterns.md` — current state, weaknesses, recent progress
 2. `question_bank.md` — problem statuses and what's been used
 3. `session_log.md` — to identify the immediately preceding session (for repeat exclusion)
+
+---
+
+## Build Status (as of 2026-04-05)
+
+### What Was Built and How
+
+**Phase 1 — Scaffold** ✅ DONE
+- `README.md`, `SETUP.md`, `WORKFLOW.md`, `problem_selection.md` — full documentation
+- `coding_patterns.md` — pre-filled with Harshita's known weak areas (DP, Backtracking, Advanced DS, Mixed multi-DS), patterns reference with C++ code snippets for DP/Trie/DSU/Monotonic Stack
+- `question_bank.md` — 28 problems seeded across weak topics (DP×10, Backtracking×6, Advanced DS×8, Mixed×4), each with notes, repeat weight, and LeetCode URLs
+- `session_log.md` — header only, ready to be filled
+- `templates/problem.cpp.template` — C++ file with problem statement, Tier 1/2 hints, YOUR NOTES all as comment blocks
+- `templates/testcases.template` — test file format with INPUT/EXPECTED blocks and flag comments
+- `templates/session_readme.template` — per-session README skeleton
+- `git init` + initial commit
+
+**Phase 2 — Core Scripts** ✅ DONE
+- `scripts/fetch_problem.py`
+  - LeetCode: GraphQL API (`/graphql`, `titleSlug` query) → full statement + examples ✅ UNTESTED end-to-end
+  - Codeforces: official REST API (`/api/problemset.problems`) for metadata (name, rating, tags) ✅ TESTED AND WORKING; HTML scrape for statement → **blocked by Cloudflare 403**, graceful fallback creates file with placeholder, user pastes statement manually ✅ TESTED
+  - `--discover-cf`: tag+rating filtered CF API query, prints matching problems ✅ TESTED AND WORKING
+  - CSES: HTML scrape of `.content` div ✅ UNTESTED
+  - `--stdin`: interactive paste mode ✅ UNTESTED
+  - Fixed Python 3.9 `X | None` type hint incompatibility ✅ FIXED
+- `scripts/run_tests.py` — compile C++17, parse `_tests.txt`, run with 2s TLE, compare output (supports UNORDERED, FLOAT flags), append results to session README ✅ WRITTEN, UNTESTED end-to-end
+- `scripts/timer.py` — countdown with per-minute alerts at 30/15/10/5/2/1 min, terminal bell ✅ WRITTEN, UNTESTED
+
+**Phase 3 — Session Management Scripts** ✅ DONE
+- `scripts/new_session.py` — creates session dir, problem stubs, README, session_summary.md, optionally launches timer ✅ WRITTEN, UNTESTED
+- `scripts/select_repeat.py` — reads question_bank + session_log + coding_patterns, scores candidates, outputs top-3 ✅ WRITTEN; tested with empty bank → correct "no candidates" output ✅
+- `scripts/update_patterns.py` — backs up coding_patterns.md to archive/, appends progress note, updates last-updated/session count, appends to session_log ✅ WRITTEN, UNTESTED
+- `CLAUDE.md` (this file) ✅ DONE
+
+**GitHub** ⏳ PENDING
+- Local git repo initialized with 3 commits ✅
+- Remote not yet connected — user needs to create private repo `dsa-tutor` on github.com and run:
+  ```bash
+  git remote add origin https://github.com/<username>/dsa-tutor.git
+  git push -u origin main
+  ```
+
+---
+
+### What Needs to Be Tested Next (in order)
+
+**1. LeetCode fetch** — UNTESTED
+```bash
+mkdir -p sessions/test_lc
+python3 scripts/fetch_problem.py --url https://leetcode.com/problems/two-sum/ --session sessions/test_lc --slot p1 --company test
+```
+Expected: `p1_two_sum.cpp` with full problem statement in comment header, tags, difficulty.
+Watch for: rate limiting (add delay if needed), premium problem check.
+
+**2. CSES fetch** — UNTESTED
+```bash
+mkdir -p sessions/test_cses
+python3 scripts/fetch_problem.py --url https://cses.fi/problemset/task/1068 --session sessions/test_cses --slot p1 --company test
+```
+Expected: `p1_weird_algorithm.cpp` with statement text. CSES may also block scraping — same fallback applies.
+
+**3. run_tests.py** — UNTESTED end-to-end
+- Write a trivial C++ solution (e.g. echo input), add test cases to `_tests.txt`, run:
+```bash
+python3 scripts/run_tests.py sessions/test_lc/p1_two_sum.cpp
+```
+Expected: PASS/FAIL per test, summary line, result appended to session README.
+Watch for: g++ path on macOS (`/usr/bin/g++`), stdin piping edge cases, TLE detection.
+
+**4. new_session.py** — UNTESTED
+```bash
+python3 scripts/new_session.py --type practice --topic dp --no-timer
+```
+Expected: `sessions/YYYY-MM-DD_practice_dp/` with p1–p4 stubs, README, session_summary.md.
+
+**5. update_patterns.py** — UNTESTED
+After running a session and filling session_summary.md:
+```bash
+python3 scripts/update_patterns.py --session sessions/<dir>
+```
+Expected: archive snapshot created, progress note appended to coding_patterns.md, session_log.md row added.
+
+**6. Full contest end-to-end** — UNTESTED
+```bash
+python3 scripts/new_session.py --type contest --company Amazon --no-timer
+# fetch 5 problems, write solutions, run tests, update patterns
+```
+
+---
+
+### Known Issues / Limitations
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| CF HTML scraping blocked by Cloudflare (403) | Medium | Handled — graceful fallback with placeholder |
+| LeetCode GraphQL untested | Medium | Test next session |
+| CSES scraping untested | Low | Test next session |
+| `run_tests.py` untested with real C++ | High | Test next session |
+| `new_session.py` untested | High | Test next session |
+| GitHub remote not set up | Low | User needs to create repo and push |
+| Python 3.9 on macOS (system python) — all scripts use `Optional` not `X \| None` | Fixed | ✅ |
+| g++ compiler path may vary — test `g++ --version` first | Low | Check during run_tests test |
+| urllib3 SSL warning (LibreSSL on macOS) — cosmetic only | Cosmetic | Suppress with `PYTHONWARNINGS=ignore` prefix if annoying |
