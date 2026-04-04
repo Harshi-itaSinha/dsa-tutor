@@ -16,6 +16,7 @@ import sys
 import time
 from datetime import date
 from pathlib import Path
+from typing import Optional
 
 # ── optional deps ─────────────────────────────────────────────────────────────
 try:
@@ -123,64 +124,194 @@ def fetch_leetcode(url: str) -> dict:
     }
 
 
+CF_API_BASE = "https://codeforces.com/api"
+
+# Codeforces API: problemset.problems
+#   GET https://codeforces.com/api/problemset.problems
+#   Optional params: tags (semicolon-separated), problemsetName
+#   Returns: { status: "OK", result: { problems: [...], problemStatistics: [...] } }
+#   Each problem: { contestId, index, name, type, points?, rating?, tags[] }
+#
+#   NOTE: The API has no endpoint to fetch a single problem by ID —
+#   the full (or tag-filtered) list is returned and we filter locally.
+#   Tag-filtered requests (e.g. ?tags=dp) are much smaller (~hundreds vs thousands).
+
+
+def cf_api_fetch_problems(tags: Optional[list] = None) -> list:
+    """
+    Call https://codeforces.com/api/problemset.problems and return the problems list.
+    If `tags` is given, pass them as a semicolon-separated filter to reduce payload.
+    """
+    params = {}
+    if tags:
+        params["tags"] = ";".join(tags)
+    resp = requests.get(f"{CF_API_BASE}/problemset.problems", params=params, timeout=20)
+    resp.raise_for_status()
+    data = resp.json()
+    if data.get("status") != "OK":
+        raise RuntimeError(f"Codeforces API error: {data.get('comment', 'unknown')}")
+    return data["result"]["problems"]
+
+
+def cf_api_get_problem_meta(contest_id: str, prob_index: str) -> Optional[dict]:
+    """
+    Fetch metadata for a single CF problem by contestId + index.
+
+    Strategy: the API doesn't support fetching one problem directly.
+    We call problemset.problems unfiltered (finds any problem) and search locally.
+    Falls back gracefully if the API is unreachable or the problem isn't in the set
+    (e.g. educational rounds, gym contests).
+    """
+    try:
+        problems = cf_api_fetch_problems()  # no tag filter — we don't know tags yet
+        for p in problems:
+            if str(p.get("contestId")) == contest_id and p.get("index", "").upper() == prob_index.upper():
+                return p
+    except Exception as e:
+        print(f"  [warn] CF API lookup failed: {e}")
+    return None
+
+
+def cf_discover_problems(
+    tags: list[str],
+    min_rating: int = 0,
+    max_rating: int = 9999,
+    count: int = 10,
+) -> list[dict]:
+    """
+    Discover CF problems matching given tags and difficulty range.
+    Uses https://codeforces.com/api/problemset.problems?tags=<tag1;tag2>
+
+    Returns up to `count` problems sorted by rating ascending.
+    Useful for seeding the question bank with targeted problems.
+    """
+    problems = cf_api_fetch_problems(tags=tags)
+    filtered = [
+        p for p in problems
+        if min_rating <= p.get("rating", 0) <= max_rating
+        and p.get("rating")  # exclude problems with no rating
+    ]
+    filtered.sort(key=lambda p: p.get("rating", 0))
+    return filtered[:count]
+
+
 def fetch_codeforces(url: str) -> dict:
-    """Scrape a Codeforces problem page."""
-    # e.g. https://codeforces.com/contest/1234/problem/A
-    #   or https://codeforces.com/problemset/problem/1234/A
+    """
+    Fetch a Codeforces problem.
+    - Metadata (name, rating, tags): Codeforces official REST API
+      https://codeforces.com/api/problemset.problems
+    - Problem statement text: HTML scrape (API does not expose statement text)
+    """
+    # parse contest_id and problem index from URL
+    # supports: /contest/1234/problem/A  and  /problemset/problem/1234/A
     m = re.search(r"codeforces\.com/(?:contest|problemset/problem)/(\d+)/(?:problem/)?([A-Z]\d*)", url, re.I)
     if not m:
         raise ValueError(f"Could not parse Codeforces URL: {url}")
     contest_id, prob_index = m.group(1), m.group(2).upper()
 
-    resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
-    resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "html.parser")
+    # ── Step 1: fetch metadata via official API ────────────────────────────────
+    print(f"  Querying Codeforces API for contest {contest_id}, problem {prob_index}...")
+    meta = cf_api_get_problem_meta(contest_id, prob_index)
 
-    title_tag = soup.find("div", class_="title")
-    title = title_tag.get_text(strip=True) if title_tag else f"CF {contest_id}{prob_index}"
-    # remove leading "A. " prefix if present
-    title = re.sub(r"^[A-Z]\d*\.\s*", "", title)
+    if meta:
+        title = meta.get("name", f"CF{contest_id}{prob_index}")
+        rating = meta.get("rating")
+        api_tags = ", ".join(meta.get("tags", []))
+        # map numeric rating to a rough difficulty label
+        if rating:
+            if rating <= 1200:   difficulty = f"CF-Easy ({rating})"
+            elif rating <= 1800: difficulty = f"CF-Medium ({rating})"
+            else:                difficulty = f"CF-Hard ({rating})"
+        else:
+            difficulty = "CF"
+        print(f"  API: name='{title}', rating={rating}, tags=[{api_tags}]")
+    else:
+        print("  API lookup failed or problem not in problemset — falling back to HTML for metadata.")
+        title = None
+        api_tags = None
+        difficulty = "CF"
 
-    statement_div = soup.find("div", class_="problem-statement")
-    if not statement_div:
-        raise RuntimeError("Could not find problem statement. Check the URL.")
+    # ── Step 2: scrape HTML for the problem statement (API doesn't return it) ─
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+    }
+    time.sleep(1)  # brief pause before HTML fetch
+    statement_text = input_text = output_text = examples = None
+    extra = ""
 
-    has_math = bool(statement_div.find("span", class_="MathJax"))
-    statement_text = h2t(str(statement_div))
+    try:
+        resp = requests.get(url, headers=headers, timeout=15)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
 
-    input_spec = soup.find("div", class_="input-specification")
-    input_text = h2t(str(input_spec)) if input_spec else "(see problem)"
+        # fallback title from HTML if API failed
+        if not title:
+            title_tag = soup.find("div", class_="title")
+            title = title_tag.get_text(strip=True) if title_tag else f"CF {contest_id}{prob_index}"
+            title = re.sub(r"^[A-Z]\d*\.\s*", "", title)
 
-    output_spec = soup.find("div", class_="output-specification")
-    output_text = h2t(str(output_spec)) if output_spec else "(see problem)"
+        statement_div = soup.find("div", class_="problem-statement")
+        if statement_div:
+            has_math = bool(statement_div.find("span", class_="MathJax"))
+            statement_text = h2t(str(statement_div))
+            extra = "\n// # MATH_CLEANUP_NEEDED — MathJax formulas may be garbled above" if has_math else ""
 
-    # grab examples
-    example_inputs = [tag.get_text() for tag in soup.select("div.input pre")]
-    example_outputs = [tag.get_text() for tag in soup.select("div.output pre")]
-    examples = ""
-    for i, (inp, out) in enumerate(zip(example_inputs, example_outputs), 1):
-        examples += f"Example {i}:\n//   Input:  {inp.strip()}\n//   Output: {out.strip()}\n//   "
+        input_spec = soup.find("div", class_="input-specification")
+        input_text = h2t(str(input_spec)) if input_spec else "(see problem)"
 
-    diff_tag = soup.find("span", class_="time-limit")
-    difficulty = "CF"  # CF doesn't have Easy/Medium/Hard
+        output_spec = soup.find("div", class_="output-specification")
+        output_text = h2t(str(output_spec)) if output_spec else "(see problem)"
 
-    tags_elems = soup.select("span.tag-box")
-    tags = ", ".join(t.get_text(strip=True) for t in tags_elems)
+        # examples from HTML
+        example_inputs  = [tag.get_text() for tag in soup.select("div.input pre")]
+        example_outputs = [tag.get_text() for tag in soup.select("div.output pre")]
+        examples = ""
+        for i, (inp, out) in enumerate(zip(example_inputs, example_outputs), 1):
+            examples += f"Example {i}:\n//   Input:  {inp.strip()}\n//   Output: {out.strip()}\n//   "
+        examples = examples.strip()
 
-    extra = "\n// # MATH_CLEANUP_NEEDED — MathJax formulas may be garbled above" if has_math else ""
+        # fallback tags from HTML if API didn't return them
+        if not api_tags:
+            tags_elems = soup.select("span.tag-box")
+            api_tags = ", ".join(t.get_text(strip=True) for t in tags_elems) or "cf"
+
+    except Exception as e:
+        # HTML scraping blocked (CF uses Cloudflare) — use API metadata only
+        print(f"  [warn] HTML scrape failed ({e})")
+        print(f"  Statement unavailable via scraping. Open the problem at:\n    {url}")
+        print("  Paste the statement into the file manually after it's created.\n")
+        if not title:
+            title = f"CF{contest_id}{prob_index}"
+        statement_text = (
+            f"PASTE STATEMENT HERE\n"
+            f"// Open: {url}\n"
+            f"// Copy the problem statement and replace this placeholder."
+        )
+        input_text = "(paste from problem page)"
+        output_text = "(paste from problem page)"
+        examples = "(paste from problem page)"
 
     return {
         "title": title,
         "slug": slugify(title),
         "difficulty": difficulty,
-        "tags": tags or "cf",
+        "tags": api_tags or "cf",
         "platform": "CF",
         "url": url,
-        "statement": statement_text + extra,
-        "input_format": input_text,
-        "output_format": output_text,
+        "statement": (statement_text or "") + extra,
+        "input_format": input_text or "(see problem)",
+        "output_format": output_text or "(see problem)",
         "constraints": "(see problem — check time/memory limits on Codeforces)",
-        "examples": examples.strip(),
+        "examples": examples or "(see problem)",
     }
 
 
@@ -264,7 +395,7 @@ def detect_platform(url: str) -> str:
     return "unknown"
 
 
-def fetch_problem_data(url: str | None, use_stdin: bool) -> dict:
+def fetch_problem_data(url: Optional[str], use_stdin: bool) -> dict:
     if use_stdin:
         return fetch_stdin()
     if not DEPS_OK:
@@ -335,16 +466,71 @@ def write_test_file(problem: dict, out_path: Path):
     print(f"  Written: {test_path}")
 
 
+def cmd_discover_cf(args):
+    """
+    --discover-cf mode: query CF API for problems by tag and rating range,
+    print a formatted list you can copy into question_bank.md.
+
+    Example:
+      python3 scripts/fetch_problem.py --discover-cf --cf-tags dp --cf-min 1400 --cf-max 2000 --count 10
+    """
+    if not DEPS_OK:
+        print("ERROR: pip3 install requests beautifulsoup4 html2text")
+        sys.exit(1)
+
+    tags = [t.strip() for t in args.cf_tags.split(",")]
+    print(f"\nQuerying CF API: tags={tags}, rating={args.cf_min}–{args.cf_max}, count={args.count}")
+    print("API: https://codeforces.com/api/problemset.problems?tags=" + ";".join(tags))
+    print()
+
+    try:
+        problems = cf_discover_problems(tags, args.cf_min, args.cf_max, args.count)
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+    if not problems:
+        print("No problems found matching those filters.")
+        return
+
+    print(f"Found {len(problems)} problem(s):\n")
+    print(f"{'#':<3} {'ID':<12} {'Rating':<8} {'Name':<45} {'Tags'}")
+    print("-" * 100)
+    for i, p in enumerate(problems, 1):
+        pid = f"{p['contestId']}{p['index']}"
+        url = f"https://codeforces.com/problemset/problem/{p['contestId']}/{p['index']}"
+        tag_str = ", ".join(p.get("tags", []))
+        print(f"{i:<3} {pid:<12} {p.get('rating', '?'):<8} {p['name'][:44]:<45} {tag_str}")
+        print(f"    URL: {url}")
+    print()
+    print("Copy the URLs above and use:")
+    print("  python3 scripts/fetch_problem.py --url <URL> --session <dir> --slot p1")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Fetch a DSA problem and create problem + test files.")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--url", help="URL of the problem (LeetCode, Codeforces, CSES)")
     group.add_argument("--stdin", action="store_true", help="Enter problem interactively via stdin")
+    group.add_argument(
+        "--discover-cf",
+        action="store_true",
+        help="Discover CF problems by tag/rating using the CF API (no file created)"
+    )
     parser.add_argument("--session", help="Session directory path (e.g. sessions/2026-04-05_Google)", default=".")
     parser.add_argument("--slot", help="Problem slot (p1–p5, or p5_REPEAT)", default="p1")
     parser.add_argument("--company", help="Company name for the session", default="practice")
     parser.add_argument("--repeat", help="Repeat status string (e.g. 'YES — from 2026-03-10_Google')", default="NO")
+    # --discover-cf options
+    parser.add_argument("--cf-tags", help="Comma-separated CF tags to search (e.g. 'dp,greedy')", default="dp")
+    parser.add_argument("--cf-min", type=int, help="Minimum CF rating", default=800)
+    parser.add_argument("--cf-max", type=int, help="Maximum CF rating", default=2400)
+    parser.add_argument("--count", type=int, help="Max problems to return in --discover-cf", default=10)
     args = parser.parse_args()
+
+    if args.discover_cf:
+        cmd_discover_cf(args)
+        return
 
     session_dir = Path(args.session)
     if not session_dir.exists():
