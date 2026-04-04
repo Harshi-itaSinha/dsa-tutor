@@ -2,6 +2,32 @@
 
 This is a file-based DSA tutoring system for Harshita. Read this before every session.
 
+---
+
+## HOW TO RESUME — read this if the user says "load dsa-tutor context from claude.md"
+
+1. **Read these files in order** (use the Read tool):
+   - `CLAUDE.md` (this file — you are here)
+   - `coding_patterns.md` — current weaknesses, comfort scores, recent progress notes
+   - `session_log.md` — last few rows to identify the most recent session
+   - `question_bank.md` — skim the Quick Index table for problem statuses
+
+2. **Check what needs testing next** — see the "What Needs to Be Tested Next" section below and tell the user the current status in one paragraph.
+
+3. **Ask the user what they want to do**:
+   - Start a new contest/practice/doubt session
+   - Test/fix a script
+   - Add problems to the bank
+   - Get a progress report
+
+4. **Do NOT re-explain the whole project** — just summarize current status and ask.
+
+**Project location:** `/Users/harshita/Desktop/Coding/dsa-tutor/`
+**GitHub:** https://github.com/Harshi-itaSinha/dsa-tutor
+**Always `git pull` first** if resuming on a different machine.
+
+---
+
 ## User Profile
 - Language: **C++** (primary)
 - Weak areas: **DP, Backtracking, Advanced DS (Tries/Seg Tree/Heaps/DSU), Mixed multi-DS problems**
