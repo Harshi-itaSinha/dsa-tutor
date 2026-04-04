@@ -19,7 +19,10 @@ from pathlib import Path
 TLE_SECONDS = 2          # seconds before a test case is killed as TLE
 MEMORY_LIMIT_MB = 512    # memory cap for the compiled binary
 CPP_STD = "c++17"
-CPP_FLAGS = ["-O2", f"-std={CPP_STD}", "-Wall", "-Wno-unused-result"]
+ROOT = Path(__file__).parent.parent
+_INCLUDE_DIR = str(ROOT / "include")
+# -I include/ provides bits/stdc++.h compatibility shim for macOS (Apple Clang)
+CPP_FLAGS = ["-O2", f"-std={CPP_STD}", "-Wall", "-Wno-unused-result", "-I" + _INCLUDE_DIR]
 
 
 # ── colours (disabled if not a tty) ───────────────────────────────────────────
