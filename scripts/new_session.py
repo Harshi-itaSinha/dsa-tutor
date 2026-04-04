@@ -126,29 +126,42 @@ def main():
     parser.add_argument("--company", help="Company name (for contest type)")
     parser.add_argument("--topic", help="Topic name (for practice/doubt type)")
     parser.add_argument("--duration", type=int, help="Duration in minutes")
+    parser.add_argument("--num-problems", type=int, help="Number of problems (practice only, default 4)")
     parser.add_argument("--no-timer", action="store_true", help="Skip timer prompt")
     args = parser.parse_args()
 
     today = date.today().isoformat()
 
-    # determine session name
+    # determine session name — use CLI args; only prompt if running interactively
+    interactive = sys.stdin.isatty()
+
     if args.type == "contest":
-        company = args.company or ask("Company name", "Google")
+        company = args.company or (ask("Company name", "Google") if interactive else "Google")
         session_name = f"{today}_{slugify(company)}"
         company_or_topic = company
         num_problems = 5
     elif args.type == "practice":
-        topic = args.topic or ask("Topic", "general")
+        topic = args.topic or (ask("Topic", "general") if interactive else "general")
         session_name = f"{today}_practice_{slugify(topic)}"
         company_or_topic = topic
-        num_problems = int(ask("Number of problems", "4"))
+        if args.num_problems:
+            num_problems = args.num_problems
+        elif interactive:
+            num_problems = int(ask("Number of problems", "4"))
+        else:
+            num_problems = 4
     else:  # doubt
-        topic = args.topic or ask("Topic", "general")
+        topic = args.topic or (ask("Topic", "general") if interactive else "general")
         session_name = f"{today}_doubt_{slugify(topic)}"
         company_or_topic = topic
         num_problems = 0
 
-    duration = args.duration or int(ask("Duration (minutes)", "90" if args.type == "contest" else "60"))
+    if args.duration:
+        duration = args.duration
+    elif interactive:
+        duration = int(ask("Duration (minutes)", "90" if args.type == "contest" else "60"))
+    else:
+        duration = 90 if args.type == "contest" else 60
 
     print(f"\nCreating session: {session_name}")
     session_dir = make_session_dir(session_name)
@@ -226,7 +239,7 @@ def main():
         print(f"  2. Work through the test question")
         print(f"  3. Add the key insight to coding_patterns.md")
 
-    if not args.no_timer and args.type in ("contest", "practice"):
+    if not args.no_timer and args.type in ("contest", "practice") and interactive:
         start_timer = ask(f"\nStart {duration}-minute timer now?", "y").lower()
         if start_timer == "y":
             print(f"\nStarting timer... (Ctrl+C to stop)")

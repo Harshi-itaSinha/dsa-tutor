@@ -1,0 +1,36 @@
+# =============================================================================
+# TEST CASES FOR: Max Tree
+# PROBLEM FILE:   p1_max_tree.cpp
+# GENERATED:      2026-04-05
+#
+# FORMAT:
+#   ---TEST N--- <label>
+#   INPUT
+#   <input lines>
+#   EXPECTED
+#   <expected output lines>
+#
+# FLAGS (add as a comment on the EXPECTED line or separately):
+#   # UNORDERED    → sort both actual and expected lines before comparing
+#   # FLOAT        → compare with epsilon 1e-6 instead of exact match
+#   # DRIVER       → problem needs a class driver (see run_tests.py docs)
+#   # INTERACTIVE  → skip automated testing; manual testing required
+# =============================================================================
+
+---TEST 1--- example from problem
+INPUT
+(fill in)
+EXPECTED
+(fill in)
+
+---TEST 2--- edge case: minimum input
+INPUT
+(fill in)
+EXPECTED
+(fill in)
+
+---TEST 3--- edge case: maximum / stress
+INPUT
+(fill in)
+EXPECTED
+(fill in)
