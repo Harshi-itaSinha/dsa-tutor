@@ -1,0 +1,75 @@
+flowchart TD
+
+    %% ─── BEFORE SESSION ───────────────────────────────────────────
+    subgraph BEFORE["🚀 BEFORE SESSION"]
+        A([You run new_session.py]) --> B[System creates session directory\np1_tbd.cpp · p2_tbd.cpp · ... · p5_REPEAT_tbd.cpp\nREADME.md · session_summary.md]
+        B --> C[Claude reads coding_patterns.md\nIdentifies HIGH priority weak topics]
+        C --> D[Selects 4 new problems\np1 Easy warm-up\np2 Medium → weakness #1\np3 Medium → weakness #2\np4 Hard → weak area]
+        D --> E([You run select_repeat.py])
+        E --> F[Reads question_bank.md + session_log.md\nScores every eligible problem\nneeds-review ×3 · weakness tag ×2\n10+ sessions ago ×1.5]
+        F --> G[Returns top-3 repeat candidates\nYou pick one → p5_REPEAT]
+        G --> H([You run fetch_problem.py --url])
+        H --> I[Fetches via LC GraphQL / CF API+cloudscraper / CSES scrape\nWrites into pN_slug.cpp:\n• Full problem statement\n• Tier 1 + Tier 2 hints\nWrites pN_slug_tests.txt:\n• INPUT / EXPECTED blocks]
+        I --> J([You run timer.py 90\nCountdown starts])
+    end
+
+    %% ─── DURING SESSION ───────────────────────────────────────────
+    subgraph DURING["⏱ DURING SESSION  — repeated per problem"]
+        K([Open pN_slug.cpp\nRead problem in comment header]) --> L{Stuck after\n15+ min?}
+        L -- No --> M([Write C++ solution\nbelow YOUR SOLUTION HERE])
+        L -- Yes → read Tier 1 hint --> M
+        M --> N([Run run_tests.py pN_slug.cpp])
+        N --> O[g++ compiles · runs each test block\nPipes INPUT → binary → compares EXPECTED]
+        O --> P{All tests\npassed?}
+        P -- "✗ FAIL  Expected X  Got Y\n⏱ TLE  exceeded 2s" --> Q{Stuck 30+ min?}
+        Q -- No --> M
+        Q -- Yes → read Tier 2 hint --> M
+        P -- "✓ All pass" --> R([Move to next problem])
+    end
+
+    %% ─── AFTER SESSION ────────────────────────────────────────────
+    subgraph AFTER["📝 AFTER SESSION"]
+        S([Fill YOUR NOTES in each pN.cpp\nApproach tried\nEdge cases missed\nConfidence 1–5]) --> T([Fill session_summary.md\nWhat went well\nWhat went wrong\nKey takeaways])
+        T --> U([Run update_patterns.py\n--session sessions/dir])
+        U --> V[Reads from session files:\n• Confidence 1-5 per problem\n• Edge cases missed\n• Test results from README.md\n• session_summary.md sections]
+        V --> W[Updates coding_patterns.md:\n• Comfort score rolling avg\n• Attempted / Solved counts\n• Priority HIGH · — · LOW\n• Progress note appended\n• Topic history updated]
+        W --> X[Updates session_log.md\nSnapshots coding_patterns.md\n→ archive/patterns_history/]
+        X --> Y([Terminal prints SESSION REPORT\nSolved N/5 · confidence bars\nTopics practiced · edge cases flagged])
+        Y --> Z([git add . && git commit && git push])
+    end
+
+    %% ─── INTELLIGENCE LOOP ────────────────────────────────────────
+    subgraph LOOP["🧠 HOW THE SYSTEM GETS SMARTER — across sessions"]
+        AA[coding_patterns.md grows\nafter every session] --> BB[SUMMARY DASHBOARD\ncomfort scores update\npriority recalculated]
+        BB --> CC{Comfort < 2.5?}
+        CC -- Yes --> DD[Priority = HIGH\nTopic flagged as weakness]
+        CC -- No --> EE[Priority = — or LOW\nTopic trending well]
+        DD --> FF[Next session:\nselect_repeat.py weights\nrepeats toward HIGH topics\nClaude picks p2–p4 from\nHIGH priority weak areas]
+        EE --> FF
+        FF --> GG([You practice what\nyou're weakest at,\nautomatically])
+    end
+
+    %% ─── FUTURE INTELLIGENCE PHASES ──────────────────────────────
+    subgraph FUTURE["🔮 FUTURE — Phases 3–5"]
+        HH["Phase 3 — Attempt Logger\nrun_tests.py appends to pN.attempts:\n2026-04-05 14:03  run 1 — 0/5 passed  failed: 2,3,4\n2026-04-05 14:21  run 2 — 3/5 passed  failed: 4\n2026-04-05 14:35  run 3 — 5/5 passed"]
+        II["Phase 4 — Failure Pattern Detection\nGot = Expected ± 1  →  off-by-one\nGot empty            →  base-case-missing\nTLE on large input   →  wrong-complexity\nWrong on edge only   →  edge-case-blindness"]
+        JJ["Phase 5 — Claude Code Review\nPaste solution → Claude fills\nEdge cases missed + RECURRING MISTAKES row\nCross-session callout:\nSame off-by-one as Q004 three sessions ago"]
+        HH --> II --> JJ
+    end
+
+    %% ─── CONNECTIONS BETWEEN SUBGRAPHS ───────────────────────────
+    J --> K
+    R --> S
+    Z --> AA
+    N --> HH
+
+    %% ─── STYLES ───────────────────────────────────────────────────
+    classDef userAction fill:#2d6a4f,color:#fff,stroke:#1b4332
+    classDef systemAction fill:#1d3557,color:#fff,stroke:#0d1b2a
+    classDef decision fill:#e76f51,color:#fff,stroke:#c1440e
+    classDef future fill:#6d6875,color:#fff,stroke:#4a4453
+
+    class A,E,H,J,K,M,N,R,S,T,U,Y,Z,GG userAction
+    class B,C,D,F,G,I,O,V,W,X,AA,BB,DD,EE,FF systemAction
+    class L,P,Q,CC decision
+    class HH,II,JJ future
