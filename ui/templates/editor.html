@@ -1,0 +1,585 @@
+{% extends "base.html" %}
+
+{% block title %}{{ problem.filename }} — DSA Tutor{% endblock %}
+
+{% block head %}
+<!-- CodeMirror 5 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+<style>
+  /* Override body/html for full-height editor layout */
+  body { overflow: hidden; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="editor-layout">
+
+  <!-- ── Column 1: Problem sidebar ─────────────────────────────────────────── -->
+  <div class="problem-sidebar">
+    <div class="sidebar-label">Problems</div>
+    {% for p in all_problems %}
+    <a
+      href="/session/{{ session_name }}/{{ p.slot }}"
+      class="sidebar-slot-btn {% if p.slot == slot %}active{% endif %}"
+    >
+      <div class="slot-label">{{ p.slot.upper() }}</div>
+      <div class="slot-meta">
+        {% if p.is_stub %}
+          <span style="color: var(--text-muted)">stub</span>
+        {% elif p.notes and p.notes.confidence and p.notes.confidence.isdigit() %}
+          {% set conf = p.notes.confidence | int %}
+          {% for i in range(conf) %}<span style="color:var(--yellow);font-size:9px;">●</span>{% endfor %}
+          {% for i in range(5 - conf) %}<span style="color:var(--border);font-size:9px;">●</span>{% endfor %}
+        {% elif p.title %}
+          <span style="font-size:10px; opacity:0.6;">✓</span>
+        {% else %}
+          <span style="opacity:0.4;">—</span>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- ── Column 2: Problem panel ───────────────────────────────────────────── -->
+  <div class="problem-panel">
+
+    <div class="problem-panel-header">
+      <div class="problem-title-row">
+        <div class="problem-title">
+          {% if problem.title %}{{ problem.title }}{% else %}Problem TBD{% endif %}
+        </div>
+      </div>
+      <div class="problem-badges">
+        <!-- Difficulty -->
+        {% if problem.difficulty %}
+          {% set diff_lower = problem.difficulty.lower() %}
+          {% if 'easy' in diff_lower %}
+            <span class="badge badge-easy">Easy</span>
+          {% elif 'hard' in diff_lower %}
+            <span class="badge badge-hard">Hard</span>
+          {% elif 'medium' in diff_lower %}
+            <span class="badge badge-medium">Medium</span>
+          {% elif 'cf' in diff_lower %}
+            <span class="badge badge-cf">{{ problem.difficulty }}</span>
+          {% elif 'cses' in diff_lower %}
+            <span class="badge badge-cses">CSES</span>
+          {% else %}
+            <span class="badge badge-neutral">{{ problem.difficulty }}</span>
+          {% endif %}
+        {% endif %}
+
+        <!-- Platform -->
+        {% if problem.platform %}
+          {% if problem.platform == 'LC' %}
+            <span class="badge badge-lc">LeetCode</span>
+          {% elif problem.platform == 'CF' %}
+            <span class="badge badge-cf">Codeforces</span>
+          {% elif problem.platform == 'CSES' %}
+            <span class="badge badge-cses">CSES</span>
+          {% else %}
+            <span class="badge badge-neutral">{{ problem.platform }}</span>
+          {% endif %}
+        {% endif %}
+
+        {% if problem.is_stub %}
+          <span class="badge badge-stub">STUB</span>
+        {% endif %}
+      </div>
+      {% if problem.url %}
+      <div class="problem-url-link mt-2">
+        <a href="{{ problem.url }}" target="_blank" rel="noopener" style="color: var(--accent); font-size:12px;">
+          ↗ Open problem
+        </a>
+      </div>
+      {% endif %}
+      {% if problem.tags and problem.tags != '?' %}
+      <div class="problem-tags-display">{{ problem.tags }}</div>
+      {% endif %}
+    </div>
+
+    <div class="problem-panel-body">
+
+      <!-- Problem statement -->
+      {% if problem.statement %}
+      <div class="problem-statement">{{ problem.statement }}</div>
+      {% else %}
+      <div class="text-muted text-small">No problem statement found.</div>
+      {% endif %}
+
+      <!-- Hints -->
+      <div class="hint-section mt-4">
+        <button class="hint-toggle-btn tier1" onclick="toggleHint('hint1', this)">
+          <span>💡 Tier 1 Hint — nudge (15+ min)</span>
+          <span id="hint1-arrow">▼</span>
+        </button>
+        <div class="hint-content" id="hint1">{% if problem.tier1 %}{{ problem.tier1 }}{% else %}No hint available.{% endif %}</div>
+      </div>
+
+      <div class="hint-section mt-2">
+        <button class="hint-toggle-btn tier2" onclick="toggleHint('hint2', this)">
+          <span>🔒 Tier 2 Hint — approach (30+ min)</span>
+          <span id="hint2-arrow">▼</span>
+        </button>
+        <div class="hint-content" id="hint2">{% if problem.tier2 %}{{ problem.tier2 }}{% else %}No hint available.{% endif %}</div>
+      </div>
+
+      <div class="panel-divider"></div>
+
+      <!-- YOUR NOTES section -->
+      <div class="notes-section">
+        <div class="notes-title">Your Notes</div>
+        <div class="notes-grid">
+
+          <!-- Confidence -->
+          <div class="form-group">
+            <div class="confidence-row">
+              <span class="confidence-label">Confidence:</span>
+              {% for i in range(1, 6) %}
+              <button
+                class="conf-btn {% if problem.notes.confidence and problem.notes.confidence.strip() == i|string %}selected{% endif %}"
+                data-value="{{ i }}"
+                onclick="setConfidence({{ i }}, this)"
+              >{{ i }}</button>
+              {% endfor %}
+              <span id="conf-display" style="font-size:12px; color:var(--text-muted); margin-left:6px;">
+                {% if problem.notes.confidence %}{{ problem.notes.confidence }}/5{% endif %}
+              </span>
+            </div>
+          </div>
+
+          <!-- Approach -->
+          <div class="form-group">
+            <label class="form-label">Approach tried</label>
+            <textarea
+              id="notes-approach"
+              class="form-control"
+              rows="2"
+              placeholder="How did you approach this problem?"
+            >{{ problem.notes.approach or '' }}</textarea>
+          </div>
+
+          <!-- Edge cases -->
+          <div class="form-group">
+            <label class="form-label">Edge cases missed</label>
+            <textarea
+              id="notes-edge-cases"
+              class="form-control"
+              rows="2"
+              placeholder="Any edge cases you missed or found tricky?"
+            >{{ problem.notes.edge_cases or '' }}</textarea>
+          </div>
+
+          <!-- Time / Space complexity -->
+          <div class="d-flex gap-2">
+            <div class="form-group flex-1">
+              <label class="form-label">Time Complexity</label>
+              <input
+                type="text"
+                id="notes-time"
+                class="form-control"
+                placeholder="O(?)"
+                value="{{ problem.notes.time_complexity or '' }}"
+              >
+            </div>
+            <div class="form-group flex-1">
+              <label class="form-label">Space Complexity</label>
+              <input
+                type="text"
+                id="notes-space"
+                class="form-control"
+                placeholder="O(?)"
+                value="{{ problem.notes.space_complexity or '' }}"
+              >
+            </div>
+          </div>
+
+          <div>
+            <button class="btn btn-secondary btn-sm" onclick="saveNotes()">💾 Save Notes</button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Fetch section (only for stubs) -->
+      {% if problem.is_stub %}
+      <div class="panel-divider"></div>
+      <div class="fetch-section">
+        <div class="fetch-title">Fetch Problem from URL</div>
+        <div class="fetch-row">
+          <input
+            type="url"
+            id="fetch-url-input"
+            class="form-control"
+            placeholder="https://leetcode.com/problems/two-sum/"
+          >
+          <button class="btn btn-secondary btn-sm" onclick="fetchProblem()" id="fetch-btn">
+            Fetch
+          </button>
+        </div>
+        <div id="fetch-status" class="mt-2" style="font-size:12px;"></div>
+      </div>
+      {% endif %}
+
+    </div><!-- end problem-panel-body -->
+  </div><!-- end problem-panel -->
+
+  <!-- ── Column 3: Code panel ──────────────────────────────────────────────── -->
+  <div class="code-panel">
+
+    <div class="code-panel-header">
+      <span class="filename-badge">{{ problem.filename }}</span>
+      <div class="code-toolbar">
+        <span class="autosave-indicator" id="autosave-indicator">Saved</span>
+        <button class="btn btn-secondary btn-sm" onclick="saveCode()">
+          💾 Save
+        </button>
+        <button class="btn btn-primary btn-sm" onclick="runTests()" id="run-btn">
+          ▶ Run Tests
+        </button>
+      </div>
+    </div>
+
+    <div class="code-editor-wrap" id="editor-wrap">
+      <textarea id="code-editor">{{ problem.code or '' }}</textarea>
+    </div>
+
+    <!-- Test results panel -->
+    <div class="test-results-panel">
+      <div class="test-results-header">
+        Test Results
+        <span id="test-summary-badge" style="margin-left: auto; font-size:12px;"></span>
+      </div>
+      <div class="test-results-body" id="test-results-body">
+        <div class="test-line info">Run tests to see results here.</div>
+      </div>
+    </div>
+
+  </div><!-- end code-panel -->
+
+</div><!-- end editor-layout -->
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/clike/clike.min.js"></script>
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  const FILEPATH = {{ problem.filepath | tojson }};
+  let confidenceValue = "{{ problem.notes.confidence or '' }}".trim();
+  let autosaveTimer = null;
+
+  // ── CodeMirror init ────────────────────────────────────────────────────────
+  const editor = CodeMirror.fromTextArea(document.getElementById('code-editor'), {
+    mode: 'text/x-c++src',
+    theme: 'dracula',
+    lineNumbers: true,
+    matchBrackets: true,
+    indentUnit: 4,
+    tabSize: 4,
+    indentWithTabs: false,
+    lineWrapping: false,
+    autofocus: true,
+    extraKeys: {
+      "Tab": function(cm) {
+        if (cm.somethingSelected()) {
+          cm.indentSelection("add");
+        } else {
+          cm.replaceSelection("    ", "end");
+        }
+      }
+    }
+  });
+
+  // Make CodeMirror fill its container
+  function resizeEditor() {
+    const wrap = document.getElementById('editor-wrap');
+    editor.setSize(wrap.offsetWidth, wrap.offsetHeight);
+  }
+
+  window.addEventListener('resize', resizeEditor);
+  // Use a small delay to let the layout settle
+  setTimeout(resizeEditor, 50);
+
+  // Mark dirty → schedule autosave
+  editor.on('change', function() {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(autoSave, 60000); // 60s autosave
+  });
+
+  // ── Get notes from form ────────────────────────────────────────────────────
+  function getNotes() {
+    return {
+      approach:         document.getElementById('notes-approach').value,
+      edge_cases:       document.getElementById('notes-edge-cases').value,
+      time_complexity:  document.getElementById('notes-time').value,
+      space_complexity: document.getElementById('notes-space').value,
+      confidence:       confidenceValue,
+    };
+  }
+
+  // ── Confidence buttons ─────────────────────────────────────────────────────
+  function setConfidence(val, btn) {
+    confidenceValue = String(val);
+    document.querySelectorAll('.conf-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    const display = document.getElementById('conf-display');
+    if (display) display.textContent = val + '/5';
+  }
+
+  // ── Save code ─────────────────────────────────────────────────────────────
+  function saveCode() {
+    return fetch('/api/save', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        filepath: FILEPATH,
+        code: editor.getValue(),
+        notes: getNotes(),
+      }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        showToast('Saved!', 'success');
+      } else {
+        showToast('Save failed: ' + (data.error || 'unknown error'), 'error');
+      }
+      return data;
+    })
+    .catch(err => {
+      showToast('Save error: ' + err.message, 'error');
+    });
+  }
+
+  // ── Save notes only ───────────────────────────────────────────────────────
+  function saveNotes() {
+    return fetch('/api/save', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        filepath: FILEPATH,
+        code: editor.getValue(),
+        notes: getNotes(),
+      }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        showToast('Notes saved!', 'success');
+      } else {
+        showToast('Save failed: ' + (data.error || 'unknown error'), 'error');
+      }
+    });
+  }
+
+  // ── Autosave ──────────────────────────────────────────────────────────────
+  function autoSave() {
+    fetch('/api/save', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        filepath: FILEPATH,
+        code: editor.getValue(),
+        notes: getNotes(),
+      }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        const ind = document.getElementById('autosave-indicator');
+        ind.textContent = 'Auto-saved';
+        ind.classList.add('visible');
+        setTimeout(() => ind.classList.remove('visible'), 2000);
+      }
+    })
+    .catch(() => {}); // silent on autosave failure
+  }
+
+  // ── Run tests ─────────────────────────────────────────────────────────────
+  function runTests() {
+    const btn = document.getElementById('run-btn');
+    const resultsBody = document.getElementById('test-results-body');
+    const summaryBadge = document.getElementById('test-summary-badge');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Running...';
+    resultsBody.innerHTML = '<div class="test-line info">Compiling and running tests...</div>';
+    summaryBadge.textContent = '';
+    summaryBadge.style.color = '';
+
+    fetch('/api/run', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        filepath: FILEPATH,
+        code: editor.getValue(),
+        notes: getNotes(),
+      }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      btn.disabled = false;
+      btn.innerHTML = '▶ Run Tests';
+
+      if (!data.ok) {
+        resultsBody.innerHTML = '<div class="test-line error">Error: ' + escHtml(data.error || 'unknown') + '</div>';
+        return;
+      }
+
+      renderTestResults(data.tests, data.summary);
+
+      // Update summary badge
+      const s = data.summary;
+      if (s.total > 0) {
+        const allPass = s.passed === s.total;
+        summaryBadge.textContent = s.passed + '/' + s.total + ' passed';
+        summaryBadge.style.color = allPass ? 'var(--green)' : 'var(--red)';
+      }
+    })
+    .catch(err => {
+      btn.disabled = false;
+      btn.innerHTML = '▶ Run Tests';
+      resultsBody.innerHTML = '<div class="test-line error">Request failed: ' + escHtml(err.message) + '</div>';
+    });
+  }
+
+  // ── Render test output ────────────────────────────────────────────────────
+  function renderTestResults(tests, summary) {
+    const body = document.getElementById('test-results-body');
+    let html = '';
+
+    for (const t of tests) {
+      if (t.status === 'pass') {
+        html += '<div class="test-line pass">' + escHtml(t.line) + '</div>';
+      } else if (t.status === 'fail') {
+        html += '<div class="test-line fail">' + escHtml(t.line) + '</div>';
+        if (t.details && t.details.length) {
+          for (const d of t.details) {
+            html += '<div class="test-line detail">' + escHtml(d) + '</div>';
+          }
+        }
+      } else if (t.status === 'tle') {
+        html += '<div class="test-line tle">' + escHtml(t.line) + '</div>';
+      } else if (t.status === 'error') {
+        html += '<div class="test-line error">' + escHtml(t.line) + '</div>';
+      } else if (t.status === 'summary') {
+        const allPass = summary.passed === summary.total && summary.total > 0;
+        const cls = allPass ? 'pass' : 'fail';
+        html += '<div class="test-line summary ' + cls + '">' + escHtml(t.line) + '</div>';
+      } else {
+        // info or detail
+        html += '<div class="test-line info">' + escHtml(t.line) + '</div>';
+      }
+    }
+
+    if (!html) {
+      html = '<div class="test-line info">No output from test runner.</div>';
+    }
+
+    body.innerHTML = html;
+    body.scrollTop = body.scrollHeight;
+  }
+
+  // ── Hint toggles ──────────────────────────────────────────────────────────
+  function toggleHint(id, btn) {
+    const content = document.getElementById(id);
+    const arrow = document.getElementById(id + '-arrow');
+    content.classList.toggle('visible');
+    if (arrow) arrow.textContent = content.classList.contains('visible') ? '▲' : '▼';
+  }
+
+  // ── Fetch problem ─────────────────────────────────────────────────────────
+  {% if problem.is_stub %}
+  function fetchProblem() {
+    const urlInput = document.getElementById('fetch-url-input');
+    const btn = document.getElementById('fetch-btn');
+    const status = document.getElementById('fetch-status');
+    const url = urlInput.value.trim();
+
+    if (!url) {
+      status.innerHTML = '<span style="color:var(--red)">Please enter a URL.</span>';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Fetching...';
+    status.innerHTML = '<span class="spinner"></span> Fetching problem data...';
+
+    fetch('/api/fetch', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        filepath: FILEPATH,
+        url: url,
+      }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      btn.disabled = false;
+      btn.textContent = 'Fetch';
+
+      if (data.ok) {
+        status.innerHTML = '<span style="color:var(--green)">Success! Reloading...</span>';
+        // Reload page — the new .cpp file will have a different name
+        setTimeout(() => {
+          if (data.new_filepath) {
+            // Redirect to the new slot path
+            window.location.reload();
+          } else {
+            window.location.reload();
+          }
+        }, 800);
+      } else {
+        status.innerHTML = '<span style="color:var(--red)">Error: ' + escHtml(data.error || 'unknown') + '</span>';
+      }
+    })
+    .catch(err => {
+      btn.disabled = false;
+      btn.textContent = 'Fetch';
+      status.innerHTML = '<span style="color:var(--red)">Request failed: ' + escHtml(err.message) + '</span>';
+    });
+  }
+  {% endif %}
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  function showToast(msg, type) {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + (type || 'info');
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 0.3s';
+      setTimeout(() => toast.remove(), 350);
+    }, 2500);
+  }
+
+  // ── Keyboard shortcut: Ctrl+S / Cmd+S to save ────────────────────────────
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      saveCode();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      runTests();
+    }
+  });
+
+  // ── Escape HTML helper ────────────────────────────────────────────────────
+  function escHtml(str) {
+    if (str === undefined || str === null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+</script>
+{% endblock %}

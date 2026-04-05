@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}{{ session_name }} — DSA Tutor{% endblock %}
+
+{% block content %}
+<div class="session-page">
+
+  <div class="session-header">
+    <a href="/" class="back-link">← Dashboard</a>
+    <h1>{{ session_name }}</h1>
+  </div>
+
+  {% if problems %}
+  <div class="problem-grid">
+    {% for p in problems %}
+    <a href="/session/{{ session_name }}/{{ p.slot_url }}" class="problem-card">
+
+      <div class="problem-card-slot">{{ p.slot.upper() }}</div>
+
+      <div class="problem-card-title">
+        {% if p.title %}
+          {{ p.title }}
+        {% else %}
+          Problem TBD
+        {% endif %}
+      </div>
+
+      <div class="problem-card-meta">
+        <!-- Difficulty badge -->
+        {% if p.difficulty %}
+          {% set diff_lower = p.difficulty.lower() %}
+          {% if 'easy' in diff_lower %}
+            <span class="badge badge-easy">Easy</span>
+          {% elif 'hard' in diff_lower %}
+            <span class="badge badge-hard">Hard</span>
+          {% elif 'medium' in diff_lower %}
+            <span class="badge badge-medium">Medium</span>
+          {% elif 'cf' in diff_lower %}
+            <span class="badge badge-cf">{{ p.difficulty }}</span>
+          {% elif 'cses' in diff_lower %}
+            <span class="badge badge-cses">CSES</span>
+          {% else %}
+            <span class="badge badge-neutral">{{ p.difficulty }}</span>
+          {% endif %}
+        {% endif %}
+
+        <!-- Platform badge -->
+        {% if p.platform %}
+          {% if p.platform == 'LC' %}
+            <span class="badge badge-lc">LeetCode</span>
+          {% elif p.platform == 'CF' %}
+            <span class="badge badge-cf">Codeforces</span>
+          {% elif p.platform == 'CSES' %}
+            <span class="badge badge-cses">CSES</span>
+          {% else %}
+            <span class="badge badge-neutral">{{ p.platform }}</span>
+          {% endif %}
+        {% endif %}
+
+        <!-- Stub badge -->
+        {% if p.is_stub %}
+          <span class="badge badge-stub">STUB</span>
+        {% endif %}
+      </div>
+
+      <!-- Tags -->
+      {% if p.tags and p.tags != '?' %}
+      <div class="problem-card-tags">
+        {{ p.tags[:60] }}{% if p.tags|length > 60 %}...{% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Confidence stars -->
+      {% if p.notes and p.notes.confidence and p.notes.confidence.isdigit() %}
+        {% set conf = p.notes.confidence | int %}
+        <div class="confidence-stars mt-2">
+          {% for i in range(1, 6) %}
+            {% if i <= conf %}
+              <span class="star-filled">★</span>
+            {% else %}
+              <span class="star-empty">☆</span>
+            {% endif %}
+          {% endfor %}
+          <span style="font-size: 11px; color: var(--text-muted); margin-left: 4px;">{{ conf }}/5</span>
+        </div>
+      {% endif %}
+
+    </a>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state" style="margin-top: 60px;">
+    <div class="empty-state-icon">📂</div>
+    <div class="empty-state-text">No problem files found in this session yet.</div>
+    <p class="text-muted text-small mt-3">
+      Use <code>fetch_problem.py</code> or click a stub slot to get started.
+    </p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

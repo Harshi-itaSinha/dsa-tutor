@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — DSA Tutor{% endblock %}
+
+{% block content %}
+<div class="page-content">
+
+  {% if error %}
+  <div class="alert alert-error">
+    <strong>Error:</strong> {{ error }}
+  </div>
+  {% endif %}
+
+  <!-- Stats row -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-value">{{ stats.session_count }}</div>
+      <div class="stat-label">Sessions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{ stats.problems_attempted }}</div>
+      <div class="stat-label">Problems Loaded</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color: var(--red)">{{ stats.high_priority }}</div>
+      <div class="stat-label">HIGH Priority Topics</div>
+    </div>
+  </div>
+
+  <!-- Start New Session -->
+  <div class="start-form-section">
+    <div class="start-form-title">Start New Session</div>
+    <form method="POST" action="/start" id="start-form">
+      <div class="start-form-grid">
+        <!-- Session type -->
+        <div class="form-group">
+          <label class="form-label">Session Type</label>
+          <div class="radio-group">
+            <div class="radio-btn">
+              <input type="radio" name="type" id="type-contest" value="contest">
+              <label for="type-contest">Contest</label>
+            </div>
+            <div class="radio-btn">
+              <input type="radio" name="type" id="type-practice" value="practice" checked>
+              <label for="type-practice">Practice</label>
+            </div>
+            <div class="radio-btn">
+              <input type="radio" name="type" id="type-doubt" value="doubt">
+              <label for="type-doubt">Doubt</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Company / Topic -->
+        <div class="form-group">
+          <label class="form-label" id="company-topic-label">Topic</label>
+          <input
+            type="text"
+            name="company_topic"
+            id="company-topic-input"
+            class="form-control"
+            placeholder="e.g. dp, backtracking, graphs"
+          >
+        </div>
+
+        <!-- Duration -->
+        <div class="form-group">
+          <label class="form-label">Duration (min)</label>
+          <input
+            type="number"
+            name="duration"
+            id="duration-input"
+            class="form-control"
+            value="60"
+            min="10"
+            max="300"
+          >
+        </div>
+
+        <!-- Num problems (practice only) -->
+        <div class="form-group" id="num-problems-group">
+          <label class="form-label">Num Problems</label>
+          <input
+            type="number"
+            name="num_problems"
+            id="num-problems-input"
+            class="form-control"
+            value="4"
+            min="1"
+            max="5"
+          >
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg" id="start-btn">
+        <span id="start-btn-text">▶ Start Session</span>
+        <span id="start-btn-spinner" style="display:none"><span class="spinner"></span> Creating...</span>
+      </button>
+    </form>
+  </div>
+
+  <!-- Main content grid -->
+  <div class="dashboard-grid">
+
+    <!-- Left: Recent Sessions -->
+    <div class="card">
+      <div class="card-header">
+        Recent Sessions
+      </div>
+      <div class="card-body" style="padding: 12px;">
+        {% if sessions %}
+        <div class="session-list">
+          {% for s in sessions %}
+          <a href="/session/{{ s.name }}" class="session-card">
+            <div class="session-card-header">
+              <span class="session-type-badge type-{{ s.type }}">{{ s.type }}</span>
+              <span class="session-date">{{ s.date }}</span>
+            </div>
+            <div class="session-name">{{ s.name }}</div>
+            <div class="session-meta">
+              {% if s.problem_count > 0 %}
+                {{ s.problem_count }} problem{{ 's' if s.problem_count != 1 else '' }}
+                &nbsp;·&nbsp;
+                {% for p in s.problems[:3] %}
+                  <span style="font-size:11px; opacity:0.7;">{{ p.slot.upper() }}</span>{% if not loop.last %}&nbsp;{% endif %}
+                {% endfor %}
+                {% if s.problem_count > 3 %}
+                  <span style="font-size:11px; opacity:0.7;">+{{ s.problem_count - 3 }} more</span>
+                {% endif %}
+              {% else %}
+                No problems yet
+              {% endif %}
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+          <div class="empty-state-icon">📁</div>
+          <div class="empty-state-text">No sessions yet. Start your first one above!</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Right: Comfort Scores -->
+    <div class="card">
+      <div class="card-header">
+        Comfort Scores by Topic
+      </div>
+      <div class="card-body" style="padding: 16px;">
+        {% if patterns %}
+        <div class="pattern-list">
+          {% for p in patterns %}
+          <div class="pattern-row">
+            <div class="pattern-name" title="{{ p.pattern }}">
+              {{ p.pattern }}
+            </div>
+            <div class="comfort-bar-track">
+              <div
+                class="comfort-bar-fill {% if p.comfort_pct < 30 %}low{% elif p.comfort_pct < 60 %}medium{% else %}high{% endif %}"
+                style="width: {{ p.comfort_pct }}%"
+              ></div>
+            </div>
+            <div class="comfort-score">{{ p.comfort }}</div>
+            <div>
+              {% if p.priority == 'HIGH' %}
+                <span class="badge badge-high">HIGH</span>
+              {% elif p.priority == 'LOW' %}
+                <span class="badge badge-low">LOW</span>
+              {% elif p.priority == '—' or p.priority == '-' %}
+                <span class="badge badge-neutral">—</span>
+              {% else %}
+                <span class="badge badge-neutral">{{ p.priority }}</span>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+          <div class="empty-state-icon">📊</div>
+          <div class="empty-state-text">No pattern data found.</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div><!-- end dashboard-grid -->
+
+</div><!-- end page-content -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const typeRadios = document.querySelectorAll('input[name="type"]');
+  const companyLabel = document.getElementById('company-topic-label');
+  const companyInput = document.getElementById('company-topic-input');
+  const durationInput = document.getElementById('duration-input');
+  const numProblemsGroup = document.getElementById('num-problems-group');
+  const startForm = document.getElementById('start-form');
+  const startBtnText = document.getElementById('start-btn-text');
+  const startBtnSpinner = document.getElementById('start-btn-spinner');
+
+  function updateFormForType() {
+    const selected = document.querySelector('input[name="type"]:checked').value;
+    if (selected === 'contest') {
+      companyLabel.textContent = 'Company';
+      companyInput.placeholder = 'e.g. Google, Amazon';
+      durationInput.value = '90';
+      numProblemsGroup.style.display = 'none';
+    } else if (selected === 'practice') {
+      companyLabel.textContent = 'Topic';
+      companyInput.placeholder = 'e.g. dp, backtracking, graphs';
+      durationInput.value = '60';
+      numProblemsGroup.style.display = '';
+    } else {
+      companyLabel.textContent = 'Topic';
+      companyInput.placeholder = 'e.g. segment tree, DP on trees';
+      durationInput.value = '60';
+      numProblemsGroup.style.display = 'none';
+    }
+  }
+
+  typeRadios.forEach(r => r.addEventListener('change', updateFormForType));
+  updateFormForType();
+
+  startForm.addEventListener('submit', function() {
+    startBtnText.style.display = 'none';
+    startBtnSpinner.style.display = 'inline-flex';
+  });
+</script>
+{% endblock %}
