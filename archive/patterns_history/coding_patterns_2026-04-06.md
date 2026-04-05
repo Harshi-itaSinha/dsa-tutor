@@ -1,6 +1,6 @@
 # Coding Patterns Tracker
 
-_Last updated: 2026-04-06 | Sessions completed: 1 | Problems solved: 1_
+_Last updated: 2026-04-05 | Sessions completed: 0 | Problems solved: 0_
 
 ---
 
@@ -14,7 +14,7 @@ _Last updated: 2026-04-06 | Sessions completed: 1 | Problems solved: 1_
 | Linked Lists | ? | 0 | 0 | — | — |
 | Stacks & Queues | ? | 0 | 0 | — | — |
 | Trees / BFS / DFS | ? | 0 | 0 | — | — |
-| Graphs | 3.0 | 1 | 1 | — | — |
+| Graphs | ? | 0 | 0 | — | — |
 | Dynamic Programming | 1 | 0 | 0 | — | HIGH |
 | Backtracking | 1 | 0 | 0 | — | HIGH |
 | Heaps / Priority Queue | ? | 0 | 0 | — | HIGH |
@@ -22,7 +22,7 @@ _Last updated: 2026-04-06 | Sessions completed: 1 | Problems solved: 1_
 | Union-Find (DSU) | ? | 0 | 0 | — | — |
 | Segment Tree / BIT | 1 | 0 | 0 | — | HIGH |
 | Mixed Multi-DS | 1 | 0 | 0 | — | HIGH |
-| Greedy | 3.0 | 1 | 1 | — | — |
+| Greedy | ? | 0 | 0 | — | — |
 | Bit Manipulation | ? | 0 | 0 | — | — |
 | Strings | ? | 0 | 0 | — | — |
 
@@ -183,14 +183,6 @@ trees: []
 
 ## PROGRESS NOTES
 _Newest first — add after each session_
-
-### 2026-04-06 — 2026-04-05_practice_cf_practice
-- Result: 1/1 solved
-- Problems:
-  - p1_max_tree.cpp: tests not run, confidence 3/5, no hints | missed: tie-breaking when x == y
-- Went well: —
-- Went wrong: —
-- Takeaways: —
 
 ### 2026-04-05 — Initial Setup
 - Project initialized. Weak areas: DP, Backtracking, Advanced DS, Mixed multi-DS.

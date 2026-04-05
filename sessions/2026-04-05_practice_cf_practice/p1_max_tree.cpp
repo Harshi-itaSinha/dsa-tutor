@@ -71,12 +71,12 @@
 //
 // YOUR NOTES (fill after solving):
 // -----------------------------------------------------------------------
-//   Approach tried:
+//   Approach tried: Greedy — for each edge, choose the direction (x or y) that gives a higher value; then use DFS to assign the permutation respecting those choices
 //
-//   Time complexity:
-//   Space complexity:
-//   Edge cases missed:
-//   Confidence (1-5):
+//   Time complexity: O(n log n)
+//   Space complexity: O(n)
+//   Edge cases missed: tie-breaking when x == y
+//   Confidence (1-5): 3
 //
 // =============================================================================
 
