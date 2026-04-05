@@ -284,12 +284,13 @@ Over many sessions, `update_patterns.py` surfaces: *"In the last 10 sessions, 4 
 
 ## Implementation Phases
 
-### Phase 1 — Scaffold + Manual Tracking ✅ DONE
+### Phase 1 — Scaffold + Manual Tracking ✅ BUILT
 **Goal:** A working system where you can run sessions and manually record what went wrong.
 
+**Built:**
 - [x] `README.md`, `SETUP.md`, `WORKFLOW.md`, `problem_selection.md`, `CLAUDE.md`
 - [x] `templates/` — problem.cpp.template, testcases.template, session_readme.template
-- [x] `coding_patterns.md` — pre-filled with weak areas + patterns reference (DP/Trie/DSU/Monotonic Stack C++ snippets)
+- [x] `coding_patterns.md` — pre-filled with weak areas + C++ patterns reference
 - [x] `question_bank.md` — 28 problems seeded (DP×10, Backtracking×6, Advanced DS×8, Mixed×4)
 - [x] `session_log.md` — header initialized
 - [x] `scripts/fetch_problem.py` — LC (GraphQL), CF (API + cloudscraper), CSES, stdin, --discover-cf
@@ -299,26 +300,88 @@ Over many sessions, `update_patterns.py` surfaces: *"In the last 10 sessions, 4 
 - [x] `scripts/select_repeat.py` — weighted repeat candidate scoring
 - [x] `scripts/update_patterns.py` — reads confidence + edge cases, updates dashboard, appends progress note
 - [x] `include/bits/stdc++.h` — macOS shim for Apple Clang
-- [x] First real session tested: CF 2143/C Max Tree, dashboard updated correctly
-- [x] All committed and pushed to GitHub
+- [x] Committed and pushed to GitHub
+
+**Phase 1 Test Results:**
+
+| What was tested | Result | Notes |
+|----------------|--------|-------|
+| `fetch_problem.py` — CF API metadata | ✅ Pass | Fetched CF 2143/C Max Tree, name/tags/rating correct |
+| `fetch_problem.py` — CF HTML statement | ✅ Pass | cloudscraper bypasses Cloudflare, LaTeX cleaned |
+| `fetch_problem.py` — CF --discover-cf | ✅ Pass | Tag+rating filtered results returned correctly |
+| `fetch_problem.py` — LeetCode GraphQL | ❌ Not tested | Needs a real LC session to verify |
+| `fetch_problem.py` — CSES scrape | ❌ Not tested | Needs network test |
+| `fetch_problem.py` -- stdin | ❌ Not tested | — |
+| `run_tests.py` — compile + run | ❌ Not tested | No C++ solution written and tested yet |
+| `timer.py` | ❌ Not tested | — |
+| `new_session.py` — non-interactive | ✅ Pass | `--no-timer` flag, creates correct directory structure |
+| `new_session.py` — interactive (timer prompt) | ❌ Not tested | — |
+| `select_repeat.py` — empty bank | ✅ Pass | "No eligible candidates" output correct |
+| `update_patterns.py` — dashboard update | ✅ Pass | Graphs+Greedy comfort updated to 3.0, progress note appended |
+| `update_patterns.py` — session log append | ✅ Pass | Row added to session_log.md |
+| Full contest end-to-end | ❌ Not tested | — |
 
 **Manual inputs required from you each session:**
-1. After solving: fill `Edge cases missed:` and `Confidence (1-5):` in the problem file
+1. After solving: fill `Edge cases missed:` and `Confidence (1-5):` in the `.cpp` file
 2. After session: fill `session_summary.md` (what went well, what went wrong, takeaways)
 3. Run `python3 scripts/update_patterns.py --session sessions/<dir>` — rest is automatic
 
 ---
 
 ### Phase 2 — End-to-End Testing 🔲 TODO
-**Goal:** Verify every script works with real problems before relying on them in a contest.
+**Goal:** Close all the ❌ gaps above before relying on the system in a real contest.
 
-- [ ] Test LeetCode fetch end-to-end with a real URL
-- [ ] Test CSES fetch end-to-end
-- [ ] Test `run_tests.py` with a written C++ solution (passing + failing cases)
-- [ ] Test `new_session.py` in interactive mode (timer prompt)
-- [ ] Test `timer.py` countdown
-- [ ] Run a full contest session start-to-finish:
-  `new_session → fetch 5 problems → write solutions → run_tests → update_patterns → commit`
+**Test checklist:**
+- [ ] `fetch_problem.py` — LeetCode URL
+  ```bash
+  mkdir -p sessions/test_lc
+  python3 scripts/fetch_problem.py --url https://leetcode.com/problems/two-sum/ --session sessions/test_lc --slot p1
+  # Expect: p1_two_sum.cpp with full statement, tags, difficulty
+  ```
+- [ ] `fetch_problem.py` — CSES URL
+  ```bash
+  mkdir -p sessions/test_cses
+  python3 scripts/fetch_problem.py --url https://cses.fi/problemset/task/1068 --session sessions/test_cses --slot p1
+  ```
+- [ ] `run_tests.py` — passing solution
+  ```bash
+  # Write a correct Two Sum solution in p1_two_sum.cpp
+  # Add 3 test cases to p1_two_sum_tests.txt
+  python3 scripts/run_tests.py sessions/test_lc/p1_two_sum.cpp
+  # Expect: ✓ TEST 1  ✓ TEST 2  ✓ TEST 3  — 3/3 passed
+  ```
+- [ ] `run_tests.py` — failing solution
+  ```bash
+  # Deliberately write a wrong solution
+  # Expect: ✗ TEST 2 — Expected: "0 1"  Got: "1 0"
+  ```
+- [ ] `timer.py`
+  ```bash
+  python3 scripts/timer.py 2
+  # Expect: 2-minute countdown with alerts, terminal bell at 0
+  ```
+- [ ] `new_session.py` — interactive
+  ```bash
+  python3 scripts/new_session.py --type practice --topic dp
+  # Expect: prompts for num problems + duration, asks to start timer
+  ```
+- [ ] Full contest end-to-end
+  ```bash
+  python3 scripts/new_session.py --type contest --company Amazon --no-timer
+  # Fetch 4 problems + 1 repeat, write solutions, run tests, update patterns, commit
+  ```
+
+**Phase 2 Test Results:** _(fill in as each is tested)_
+
+| What was tested | Result | Notes |
+|----------------|--------|-------|
+| LeetCode fetch | 🔲 | — |
+| CSES fetch | 🔲 | — |
+| `run_tests.py` passing | 🔲 | — |
+| `run_tests.py` failing | 🔲 | — |
+| `timer.py` | 🔲 | — |
+| `new_session.py` interactive | 🔲 | — |
+| Full contest end-to-end | 🔲 | — |
 
 ---
 
@@ -341,7 +404,15 @@ Over many sessions, `update_patterns.py` surfaces: *"In the last 10 sessions, 4 
 ```
 | Pattern | Comfort | Attempted | Solved | Avg Runs to Pass | Avg Time | Priority |
 ```
-`Avg Runs to Pass > 3` on a topic → problem is you don't just lack knowledge, you make implementation mistakes even when you know the approach.
+
+**Phase 3 Test Results:** _(fill in after building)_
+
+| What was tested | Result | Notes |
+|----------------|--------|-------|
+| `.attempts` file created on first run | 🔲 | — |
+| Appends correctly on subsequent runs | 🔲 | — |
+| `update_patterns.py` reads attempts + computes struggle score | 🔲 | — |
+| Dashboard shows `Avg Runs to Pass` column | 🔲 | — |
 
 ---
 
@@ -350,39 +421,50 @@ Over many sessions, `update_patterns.py` surfaces: *"In the last 10 sessions, 4 
 
 **What to build:**
 - In `run_tests.py`, after a FAIL: compare `Got` vs `Expected` and emit a `mistake_hint`:
-  - `Got = Expected ± 1` → `off-by-one`
+  - `Got = Expected ± 1` on multiple tests → `off-by-one`
   - `Got` is empty string → `base-case-missing`
   - TLE → `wrong-complexity`
-  - `Got` matches on test 1 (basic), wrong on test 3 (edge) → `edge-case-blindness`
-  - `Got` has very large/negative number → `overflow`
-- Log the classification into the `.attempts` file alongside the failed test numbers
-- `update_patterns.py` aggregates mistake categories across all sessions and adds a new section to `coding_patterns.md`:
+  - Correct on test 1 (basic), wrong on test 3+ (edge) → `edge-case-blindness`
+  - Got has very large/negative/zero unexpectedly → `overflow`
+- Log the classification into the `.attempts` file
+- `update_patterns.py` aggregates and adds to `coding_patterns.md`:
+  ```
+  ## MISTAKE PATTERNS (auto-detected)
+  | Category | Count | Most recent | Topics most affected |
+  | off-by-one | 8 | 2026-04-10 | Binary Search, DP |
+  | edge-case-blindness | 5 | 2026-04-08 | Backtracking |
+  ```
 
-```markdown
-## MISTAKE PATTERNS (auto-detected, last 30 sessions)
-| Category | Count | Most recent | Topics most affected |
-|----------|-------|-------------|---------------------|
-| off-by-one | 8 | 2026-04-10 | Binary Search, DP |
-| edge-case-blindness | 5 | 2026-04-08 | Backtracking |
-| overflow | 3 | 2026-04-06 | DP |
-```
+**Phase 4 Test Results:** _(fill in after building)_
 
-This tells you not just *that* you struggle with DP — but *how* you fail at it.
+| What was tested | Result | Notes |
+|----------------|--------|-------|
+| `off-by-one` correctly detected | 🔲 | — |
+| `base-case-missing` detected | 🔲 | — |
+| `overflow` detected | 🔲 | — |
+| MISTAKE PATTERNS section appears in `coding_patterns.md` | 🔲 | — |
 
 ---
 
 ### Phase 5 — Claude Code Review Integration 🔲 TODO
-**Goal:** At end of session, Claude reads your solution code and automatically identifies mistake patterns that the file-level tracking can't see (wrong algorithm choice, missed pruning, poor variable naming that led to logic errors).
+**Goal:** At end of session, Claude reads your solution code and identifies mistake patterns that file-level tracking can't see (wrong algorithm choice, missed pruning, naming confusion that caused logic errors).
 
 **What to build:**
 - A post-session prompt template: "Review my solution for p2 and fill in `Edge cases missed:` and suggest a row for `RECURRING MISTAKES`"
-- Claude reads the `.cpp` solution, the test failures from `.attempts`, and produces:
+- Claude reads the `.cpp` solution + `.attempts` file and produces:
   - A filled `Edge cases missed:` line
   - A categorized mistake entry ready to paste into `RECURRING MISTAKES`
   - One-line takeaway for `coding_patterns.md`
-- Over time, Claude cross-references past mistakes: *"You made the same off-by-one error in binary search that you made 3 sessions ago in Q004."*
+  - Cross-session callout: *"Same off-by-one as in Q004 three sessions ago."*
 
-**This layer requires no new scripts** — it's a workflow change: you paste your code to Claude at the end of each session instead of self-diagnosing.
+**This layer requires no new scripts** — it's a workflow addition: paste your solution to Claude at the end of each session instead of self-diagnosing.
+
+**Phase 5 Test Results:** _(fill in after building)_
+
+| What was tested | Result | Notes |
+|----------------|--------|-------|
+| Code review prompt produces `Edge cases missed:` | 🔲 | — |
+| Cross-session mistake reference works | 🔲 | — |
 
 ---
 
